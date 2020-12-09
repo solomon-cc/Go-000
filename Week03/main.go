@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
-	stop := make(chan struct{})
+	stop := make(chan struct{}) // stop chan
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -27,7 +28,6 @@ func main() {
 		}
 
 		return nil
-
 	})
 
 	g.Go(func() error {
@@ -37,16 +37,27 @@ func main() {
 		}
 
 		return nil
-
 	})
 
+	// notify system sigals
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGKILL, os.Interrupt)
 
 	go func() {
 		sig := <-sigs
-		logrus.Errorf("catch sigal: %v, exiting..", sig)
+		logrus.Infof("recv sigal: %v, Now exiting...", sig)
 		cancel()
-		
+
 	}()
+
+	go func() {
+		<-ctx.Done()
+		s1.Shutdown(ctx) // ignore err
+		s2.Shutdown(ctx) // ignore err
+
+		close(stop)
+
+	}()
+
+	<-stop
 }
