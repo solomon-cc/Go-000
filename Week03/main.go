@@ -2,62 +2,50 @@ package main
 
 import (
 	"context"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 )
 
 func main() {
-	stop := make(chan struct{}) // stop chan
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	g, ctx := errgroup.WithContext(context.Background())
 
-	g, _ := errgroup.WithContext(ctx)
-
-	s1 := NewHttpServer(":8080")
-	s2 := NewHttpServer(":8081")
+	s := NewHttpServer(":80")
 
 	g.Go(func() error {
-		if err := s1.ListenAndServe(); err != nil {
-			cancel()
-			return err
-		}
+		g.Go(func() error {
+			<-ctx.Done()
+			logrus.Info("http ctx done")
+			return s.Shutdown(context.TODO())
+		})
 
-		return nil
-	})
-
-	g.Go(func() error {
-		if err := s2.ListenAndServe(); err != nil {
-			cancel()
-			return err
-		}
-
-		return nil
+		return s.ListenAndServe()
 	})
 
 	// notify system sigals
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGKILL, os.Interrupt)
 
-	go func() {
-		sig := <-sigs
-		logrus.Infof("recv sigal: %v, Now exiting...", sig)
-		cancel()
+	g.Go(func() error {
+		for {
+			logrus.Info("signal sentinels")
+			select {
+			case <-ctx.Done():
+				logrus.Info("signal ctx done")
+				return ctx.Err()
+			case <-sigs:
+				logrus.Infof("recv sigal, Now exiting...")
+				return errors.New("signal exit")
 
-	}()
+			}
+		}
+	})
 
-	go func() {
-		<-ctx.Done()
-		s1.Shutdown(ctx) // ignore err
-		s2.Shutdown(ctx) // ignore err
+	err := g.Wait()
+	logrus.Error(err)
 
-		close(stop)
-
-	}()
-
-	<-stop
 }
