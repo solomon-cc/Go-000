@@ -22,17 +22,16 @@ func TestMax(t *testing.T) {
 func TestAvg(t *testing.T) {
 
 	n := NewNumber()
-	for _, x := range []int64{1, 2, 3, 4, 5} {
+	for _, x := range []int64{1, 2, 3, 4, 5, 6} {
 		n.Increment(x)
 		time.Sleep(1 * time.Second)
 	}
 
-	if n.Avg(time.Now()) != 3 {
+	if n.Avg(time.Now()) != 4 {
 		t.Error("failed")
 	}
 
 }
-
 
 func TestSum(t *testing.T) {
 
