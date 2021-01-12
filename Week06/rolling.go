@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const WINDOWSIZE=5
+
 type Number struct {
 	Buckets map[int64]*bucket
 	Mu      *sync.RWMutex
@@ -35,7 +37,7 @@ func (rn *Number) getCurrentBucket() *bucket {
 }
 
 func (rn *Number) removeOldBuckets() {
-	expired := time.Now().Unix() - 5
+	expired := time.Now().Unix() - WINDOWSIZE
 	for timestamp := range rn.Buckets {
 		if timestamp <= expired {
 			delete(rn.Buckets, timestamp)
@@ -72,7 +74,7 @@ func (rn *Number) Sum(now time.Time) int64 {
 	defer rn.Mu.RUnlock()
 
 	for timestamp, bucket := range rn.Buckets {
-		if timestamp >= now.Unix()-5 {
+		if timestamp >= now.Unix()-WINDOWSIZE {
 			sum += bucket.Value
 		}
 	}
@@ -87,7 +89,7 @@ func (rn *Number) Max(now time.Time) int64 {
 	defer rn.Mu.RUnlock()
 
 	for timestamp, bucket := range rn.Buckets {
-		if timestamp >= now.Unix()-5 {
+		if timestamp >= now.Unix()-WINDOWSIZE {
 			if bucket.Value > max {
 				max = bucket.Value
 			}
@@ -98,5 +100,5 @@ func (rn *Number) Max(now time.Time) int64 {
 
 // Avg 计算最新 5 个桶内计数器的平均值
 func (rn *Number) Avg(now time.Time) int64 {
-	return rn.Sum(now) / 5
+	return rn.Sum(now) / WINDOWSIZE
 }
